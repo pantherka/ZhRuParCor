@@ -18,9 +18,9 @@ def unescape(text):
     return re.sub("&#?\w+;", fixup, text)
 
 # put the path to your file directory here
-DIR_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/corpus materials (2)'   # chinese_texts
+DIR_PATH = 'data'   # chinese_texts
 # put the path to the dictionary here
-DICT_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/cedict_ts (1).u8'   # cedict_ts.utf8
+DICT_PATH = 'dic/cedict_ts.u8'   # cedict_ts.utf8
 # smart transription split
 re_transcr = re.compile('([^\]]*\])')
 re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]') # LEAVING WORKING PUNCT
