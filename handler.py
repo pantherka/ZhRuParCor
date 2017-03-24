@@ -12,7 +12,7 @@ DICK_PATH = 'dic/cedict_ts.u8'
 DICK_CACHE = 'dic/cedict.dat'
 
 class ZhXMLProcessor():
-    def __init__(self):
+    def __init__(self, dict_path):
         self.re_link = re.compile('(?:see_|see_also_|(?:old)?variant_of_|same_as_)([^,]*)')
         self.re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]') # LEAVING WORKING PUNCT
         self.punct_dict = ''.maketrans(
@@ -22,7 +22,7 @@ class ZhXMLProcessor():
             with open(DICK_CACHE, 'r') as jsonfile:
                 self.cedict = json.load(jsonfile)
         except:
-            self.cedict = self.load_dict(DICK_PATH)
+            self.cedict = self.load_dict(dict_path)
             with open(DICK_CACHE, 'w') as outfile:
                 json.dump(self.cedict, outfile)
 
@@ -75,13 +75,16 @@ class ZhXMLProcessor():
             if len(key) < 1:
                 # TODO: add non-found char to hz/zh2
                 key = txt_zh[pos:pos+1]
-                #zh.append(key)
-                #zh2.appech(key)
+                zh.tail(key)
+                zh2.tail(key)
                 continue
             worddef = self.cedict[key]
             print(b"%s [%d - %d]" % (key.encode('utf-8'), pos, pos+cnt-1))
             # TODO: form correct definition
-            ET.SubElement(zh, "w", lex=key, transcr=worddef[0], sem=worddef[1]).text(key)
+            for definition in worddef:
+                # Appending <ana> for each interpretation
+                print(definition[0].encode('utf-8'))
+                #ET.SubElement(zh, "w", lex=key, transcr=worddef[0], sem=worddef[1]).text(key)
         return para
 
     def process_file(self, path):   
@@ -108,7 +111,7 @@ class ZhXMLProcessor():
             new_f.write(ET.tostring(root, pretty_print=True))
 
 if __name__ == '__main__':
-    proc = ZhXMLProcessor()
+    proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
         if f.endswith('8.xml') and '_processed' not in f  and 'REPL' not in f:
             print("Processing %s" % f)
