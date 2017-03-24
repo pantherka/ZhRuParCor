@@ -57,16 +57,19 @@ class ZhXMLProcessor():
         definition = ''
         return definition
 
-    def anal(self, sent):
-        # Take sentence, look up each sequence of words in dict
-        return ('word', 'lex', 'transcr', 'sem')
+    def clean_definition(self, definition, key, transcr):
+        # TODO: clean up definition as  in kuz.py
+        return definition
 
     def process_para(self, txt_ru, txt_zh):
         para = ET.Element("para")
         ET.SubElement(para, "se", lang="ru").text = txt_ru
         zh = ET.SubElement(para, "se", lang="zh")
+        zh.text = ""
         zh2 = ET.SubElement(para, "se", lang="zh2")
-        # TODO: make greedy 2-pointer search
+        zh2.text = ""
+        last_zh = None
+        last_zh2 = None
         for pos in range(len(txt_zh)):
             cnt = 1
             while txt_zh[pos:pos+cnt] in self.cedict:
@@ -75,22 +78,37 @@ class ZhXMLProcessor():
             if len(key) < 1:
                 # TODO: add non-found char to hz/zh2
                 key = txt_zh[pos:pos+1]
-                zh.tail(key)
-                zh2.tail(key)
+                if last_zh is not None:
+                    last_zh.tail = key
+                else:
+                    zh.text = zh.text + key
+                if last_zh2 is not None:
+                    last_zh.tail = key
+                else:
+                    zh2.text = zh2.text + key
                 continue
             worddef = self.cedict[key]
-            print(b"%s [%d - %d]" % (key.encode('utf-8'), pos, pos+cnt-1))
             # TODO: form correct definition
+            last_zh = ET.SubElement(zh, 'w')
+            last_zh2 = ET.SubElement(zh2, 'w')
+            ana_zh = None
+            transcr = ""
+            ana_zh2 = None
             for definition in worddef:
                 # Appending <ana> for each interpretation
-                print(definition[0].encode('utf-8'))
-                #ET.SubElement(zh, "w", lex=key, transcr=worddef[0], sem=worddef[1]).text(key)
+                transcr = definition[1]
+                desc = self.clean_definition(definition[2], key, transcr)
+                ana_zh = ET.SubElement(last_zh, "ana", lex=definition[0], transcr=transcr, sem=desc)
+                ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc)
+            ana_zh.tail = key
+            ana_zh2.tail = transcr
         return para
 
     def process_file(self, path):   
         # TODO: autodetect encoding from XML header/whatnot
         with open(path, 'r', encoding='utf-8') as fh:
             new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'wb')
+            new_f.write(b'<?xml version="1.0" encoding="utf-8"?><html>\n<head>\n</head>\n<body>')
             html = fh.read()
             #html = html.replace('encoding="UTF-16"', '')
             root = ET.XML(html)
@@ -106,9 +124,10 @@ class ZhXMLProcessor():
                 if len(ru) < 1 or len(zh) < 1:
                     print("Error fetching sentence!")
                 para = self.process_para(ru, zh)
-                print(ET.tostring(para))
                 parent[:] = para
-            new_f.write(ET.tostring(root, pretty_print=True))
+                new_f.write(ET.tostring(parent, pretty_print=True))
+            new_f.write(b"</body></html>")
+            new_f.close()
 
 if __name__ == '__main__':
     proc = ZhXMLProcessor(DICK_PATH)
