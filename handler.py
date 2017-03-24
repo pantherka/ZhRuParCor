@@ -67,10 +67,21 @@ class ZhXMLProcessor():
         zh = ET.SubElement(para, "se", lang="zh")
         zh2 = ET.SubElement(para, "se", lang="zh2")
         # TODO: make greedy 2-pointer search
-                if len(word) > 1:
-                    zh.append(word[0])
-                else:
-                    ET.SubElement(zh, "w", lex=word[1], transcr=word[2], sem=word[3]).text(word[0])
+        for pos in range(len(txt_zh)):
+            cnt = 1
+            while txt_zh[pos:pos+cnt] in self.cedict:
+                cnt += 1
+            key = txt_zh[pos:pos+cnt-1]
+            if len(key) < 1:
+                # TODO: add non-found char to hz/zh2
+                key = txt_zh[pos:pos+1]
+                #zh.append(key)
+                #zh2.appech(key)
+                continue
+            worddef = self.cedict[key]
+            print(b"%s [%d - %d]" % (key.encode('utf-8'), pos, pos+cnt-1))
+            # TODO: form correct definition
+            ET.SubElement(zh, "w", lex=key, transcr=worddef[0], sem=worddef[1]).text(key)
         return para
 
     def process_file(self, path):   
