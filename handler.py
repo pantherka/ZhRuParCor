@@ -87,6 +87,7 @@ class ZhXMLProcessor():
                 else:
                     zh2.text = zh2.text + key
                 continue
+            pos += cnt - 1
             worddef = self.cedict[key]
             # TODO: form correct definition
             last_zh = ET.SubElement(zh, 'w')
