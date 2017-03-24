@@ -1,4 +1,5 @@
-# coding: utf-8
+#!/usr/bin/env python3
+#coding=utf-8
 
 import re, os, lxml.html, time
 from collections import OrderedDict
@@ -12,6 +13,11 @@ DICK_CACHE = 'dic/cedict.dat'
 
 class ZhXMLProcessor():
     def __init__(self):
+        self.re_link = re.compile('(?:see_|see_also_|(?:old)?variant_of_|same_as_)([^,]*)')
+        self.re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]') # LEAVING WORKING PUNCT
+        self.punct_dict = ''.maketrans(
+                {'，': ',', '。': '.', '？': '?', '、': ',', '！': '!', '：': ':', '；': ';', '（': '(', '）': ')', '“': '"',
+                 '”': '"', '-': '-', '《': '«', '》': '»'})
         try:
             with open(DICK_CACHE, 'r') as jsonfile:
                 self.cedict = json.load(jsonfile)
@@ -20,7 +26,7 @@ class ZhXMLProcessor():
             with open(DICK_CACHE, 'w') as outfile:
                 json.dump(self.cedict, outfile)
 
-    def load_dict(self, path): # todo: save the dictionary in json and do not load it every time
+    def load_dict(self, path): 
         """
         transforms the dictionary file into a computationally feasible format
         :param path: the path to the dictionary
@@ -47,18 +53,52 @@ class ZhXMLProcessor():
                     cedict[new].append((old, transcr, transl))
         return cedict
 
-def read_files():
-    for f in os.listdir(PATH):
-        if f.endswith('8.xml') and '_processed' not in f  and 'REPL' not in f:
-            print(f)
-            with open(os.path.join(PATH, f), 'r') as fh:
-                new_f = open(os.path.join(PATH, f.rsplit('.', 1)[0] + 'REPL.xml'), 'wb')
-                html = fh.read()
-                #html = html.replace('encoding="UTF-16"', '')
-                root = ET.XML(html)
-                for parent in root.xpath('//PARAGRAPH'):  # Search for parent elements
-                    parent[:] = sorted(parent, key=lambda x: x.tag, reverse=True)
-                new_f.write(ET.tostring(root, pretty_print=True))
+    def search_dict(self, word):
+        definition = ''
+        return definition
+
+    def anal(self, sent):
+        # Take sentence, look up each sequence of words in dict
+        return ('word', 'lex', 'transcr', 'sem')
+
+    def process_para(self, txt_ru, txt_zh):
+        para = ET.Element("para")
+        ET.SubElement(para, "se", lang="ru").text = txt_ru
+        zh = ET.SubElement(para, "se", lang="zh")
+        zh2 = ET.SubElement(para, "se", lang="zh2")
+        # TODO: make greedy 2-pointer search
+                if len(word) > 1:
+                    zh.append(word[0])
+                else:
+                    ET.SubElement(zh, "w", lex=word[1], transcr=word[2], sem=word[3]).text(word[0])
+        return para
+
+    def process_file(self, path):   
+        # TODO: autodetect encoding from XML header/whatnot
+        with open(path, 'r', encoding='utf-8') as fh:
+            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'wb')
+            html = fh.read()
+            #html = html.replace('encoding="UTF-16"', '')
+            root = ET.XML(html)
+            for parent in root.xpath('//PARAGRAPH'):  # Search for parent elements
+                parent.tag = 'para'
+                ru = ""
+                zh = ""
+                for sent in parent:
+                    if sent.tag == 'FOREIGN':
+                        zh = sent.text
+                    if sent.tag == 'NATIVE':
+                        ru = sent.text
+                if len(ru) < 1 or len(zh) < 1:
+                    print("Error fetching sentence!")
+                para = self.process_para(ru, zh)
+                print(ET.tostring(para))
+                parent[:] = para
+            new_f.write(ET.tostring(root, pretty_print=True))
 
 if __name__ == '__main__':
     proc = ZhXMLProcessor()
+    for f in os.listdir(PATH):
+        if f.endswith('8.xml') and '_processed' not in f  and 'REPL' not in f:
+            print("Processing %s" % f)
+            proc.process_file(os.path.join(PATH, f))
