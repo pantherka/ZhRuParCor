@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #coding=utf-8
 
 import re, os, lxml.html, time, string
@@ -18,9 +18,9 @@ def unescape(text):
     return re.sub("&#?\w+;", fixup, text)
 
 # put the path to your file directory here
-DIR_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/corpus materials (2)'   # chinese_texts
+DIR_PATH = 'data'   # chinese_texts
 # put the path to the dictionary here
-DICT_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/cedict_ts (1).u8'   # cedict_ts.utf8
+DICT_PATH = 'dic/cedict_ts.u8'   # cedict_ts.utf8
 # smart transription split
 re_transcr = re.compile('([^\]]*\])')
 re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]') # LEAVING WORKING PUNCT
@@ -114,7 +114,7 @@ def load_corpus(path, cedict, bAnton=True):
                             s = s.replace(', ', ' ')
                             term = re.findall(r'>(\W+?)</se>',s)
                             for trm in term:
-                                print(trm[0])	# RECENTLY DISABLED
+                                print(trm[0].encode('utf-8'))	# RECENTLY DISABLED
                                 terminal = trm[0]
                             #print(s)
                             #rus = re.sub(r'<se lang="zh".+</se>','',p)
@@ -210,7 +210,7 @@ def make_xml(fname, cedict):
             # delete all the punctuation (keep in the original sentence)
             while len(fragment) > 0:
                 if len(re.findall('[ａ-ｚ]', fragment)) > 0:
-                    print('Whoosh, processing wide latin: ' + fragment)
+                    print(b'Whoosh, processing wide latin: ' + fragment.encode('utf-8'))
                 # if we still have smth in the fragment...
                 chunk = fragment
                 # find the shortest dictionary entry
