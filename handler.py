@@ -79,11 +79,15 @@ class ZhXMLProcessor():
                 # TODO: add non-found char to hz/zh2
                 key = txt_zh[pos:pos+1]
                 if last_zh is not None:
-                    last_zh.tail = key
+                    if last_zh.tail == None:
+                        last_zh.tail = ""
+                    last_zh.tail += key
                 else:
                     zh.text = zh.text + key
                 if last_zh2 is not None:
-                    last_zh.tail = key
+                    if last_zh2.tail == None:
+                        last_zh2.tail = ""
+                    last_zh2.tail += key
                 else:
                     zh2.text = zh2.text + key
                 continue
