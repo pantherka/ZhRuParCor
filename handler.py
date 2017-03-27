@@ -11,6 +11,8 @@ PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/corpus materials
 DICK_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/cedict_ts (1).u8'
 DICK_CACHE = 'dic/cedict.dat'
 
+from config import *
+
 def unescape(text):
     def fixup(m):
         text = m.group(0)
@@ -224,14 +226,14 @@ class ZhXMLProcessor():
         return gr_cl
 
     def clean_sem(self, definition):
-        print(definition)
+        #print(definition)
         defi = definition[2]
-        print(defi)
+        #print(defi)
         cls = re.findall(r'/CL:.+?/', defi)
         for cl in cls:
             print(cl)
             defi = defi.replace(cl,'')
-        print(defi)
+        #print(defi)
         sem = defi.replace(' ','_').replace('/',' ').replace(',_',' ').replace(',',' ').strip('_').strip()
         transcr = re.findall(r'\[[0-9A-z]+?\]',sem)
         for tr in transcr:
@@ -248,12 +250,14 @@ class ZhXMLProcessor():
         zh2.text = ""
         last_zh = None
         last_zh2 = None
-        for pos in range(len(txt_zh)):
+        pos = 0
+        #print(txt_zh)
+        while pos < len(txt_zh):
             cnt = 1
-            while txt_zh[pos:pos+cnt] in self.cedict:
+            while txt_zh[pos:pos+cnt] in self.cedict.keys():
+                #print("Checking key: %s" % txt_zh[pos:pos+cnt])
                 cnt += 1
             key = txt_zh[pos:pos+cnt-1]
-            print(("Found key: %s (%d)" % (key, cnt)).encode())
             if len(key) < 1:        # not found in dict
                 # add non-found char to hz/zh2
                 key = txt_zh[pos:pos+1]
@@ -270,8 +274,10 @@ class ZhXMLProcessor():
                     last_zh2.tail += key
                 else:
                     zh2.text = zh2.text + key
+                pos += 1
                 continue
             pos += cnt - 1
+            #print("Found key: %s (%d)\n" % (key, cnt))
             worddef = self.cedict[key]
             #print('KEY PRINTING...', key)
             #print('JSON PRINTING...',self.cedict[key])
