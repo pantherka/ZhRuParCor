@@ -231,7 +231,7 @@ class ZhXMLProcessor():
         #print(defi)
         cls = re.findall(r'/CL:.+?/', defi)
         for cl in cls:
-            print(cl)
+            #print(cl)
             defi = defi.replace(cl,'')
         #print(defi)
         sem = defi.replace(' ','_').replace('/',' ').replace(',_',' ').replace(',',' ').strip('_').strip()
@@ -254,8 +254,8 @@ class ZhXMLProcessor():
         #print(txt_zh)
         while pos < len(txt_zh):
             cnt = 1
-            while txt_zh[pos:pos+cnt] in self.cedict.keys():
-                #print("Checking key: %s" % txt_zh[pos:pos+cnt])
+            while txt_zh[pos:pos+cnt] in self.cedict.keys() and cnt < len(txt_zh) - pos:
+                #print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
                 cnt += 1
             key = txt_zh[pos:pos+cnt-1]
             if len(key) < 1:        # not found in dict
@@ -298,7 +298,8 @@ class ZhXMLProcessor():
                 gr_cls = self.process_classifiers(definition)
                 #print(gr_cls)
                 #print(desc)
-                if desc == 'MOD' or desc == 'PFV' or desc == 'PRG' or desc == 'PST' or desc == 'EVAL' or desc == 'QUEST' or desc == 'CAUS' or desc == 'PL' or desc == 'BA' or desc == 'ATRN' or desc == 'ATRV' or desc == 'PASS' or desc == 'DIR':
+                if desc in ['MOD', 'PFV', 'PRG', 'PST', 'EVAL', 'QUEST', 'CAUS', 'PL', 'BA', 'ATRN', 'ATRV', 'PASS', 'DIR']:
+                #if desc == 'MOD' or desc == 'PFV' or desc == 'PRG' or desc == 'PST' or desc == 'EVAL' or desc == 'QUEST' or desc == 'CAUS' or desc == 'PL' or desc == 'BA' or desc == 'ATRN' or desc == 'ATRV' or desc == 'PASS' or desc == 'DIR':
                     ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, gr=desc)
                     ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
                 else:
@@ -342,6 +343,6 @@ class ZhXMLProcessor():
 if __name__ == '__main__':
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
-        if f.endswith('est.xml') and '_processed' not in f  and 'REPL' not in f:
+        if f.endswith('1.xml') and '_processed' not in f  and 'REPL' not in f:
             print("Processing %s" % f)
             proc.process_file(os.path.join(PATH, f))
