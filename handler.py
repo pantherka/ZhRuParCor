@@ -253,6 +253,7 @@ class ZhXMLProcessor():
             while txt_zh[pos:pos+cnt] in self.cedict:
                 cnt += 1
             key = txt_zh[pos:pos+cnt-1]
+            print(("Found key: %s (%d)" % (key, cnt)).encode())
             if len(key) < 1:        # not found in dict
                 # add non-found char to hz/zh2
                 key = txt_zh[pos:pos+1]
@@ -335,6 +336,6 @@ class ZhXMLProcessor():
 if __name__ == '__main__':
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
-        if f.endswith('8.xml') and '_processed' not in f  and 'REPL' not in f:
+        if f.endswith('est.xml') and '_processed' not in f  and 'REPL' not in f:
             print("Processing %s" % f)
             proc.process_file(os.path.join(PATH, f))
