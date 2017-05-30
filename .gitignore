@@ -90,5 +90,7 @@ ENV/
 
 .DS_Store
 *.icloud
+anton*
+XML_compare*
 
 config.py
