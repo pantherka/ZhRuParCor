@@ -304,8 +304,8 @@ class ZhXMLProcessor():
                     ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
                 else:
                     if gr_cls != 'NO':
-                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr = gr_cls)
-                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr = gr_cls)
+                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr = 'DEFAULT，' + gr_cls)
+                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr = 'DEFAULT，' + gr_cls)
                     else:
                         ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc,gr='DEFAULT')
                         ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc,gr='DEFAULT')
@@ -343,6 +343,6 @@ class ZhXMLProcessor():
 if __name__ == '__main__':
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
-        if f.endswith('1.xml') and '_processed' not in f  and 'REPL' not in f:
+        if f.endswith('.xml') and '_processed' not in f  and 'REPL' not in f:
             print("Processing %s" % f)
             proc.process_file(os.path.join(PATH, f))
