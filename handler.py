@@ -1,38 +1,29 @@
 #!/usr/bin/env python3
 #coding=utf-8
 
-import re, os, lxml.html, time
+import re
+import os
+import lxml.html
+import time
 from collections import OrderedDict
 import lxml.etree as ET
 from lxml import objectify
 import json
 
-PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/corpus materials (2)'   # chinese_texts
-DICK_PATH = '/Users/marat/Documents/ZhRuParCo/ruzhparallel-materials/cedict_ts (1).u8'
-DICK_CACHE = 'dic/cedict.dat'
+DICK_PATH = 'cedict_ts.u8'
+DICK_CACHE = 'cedict.txt'
+PATH = os.path.join(os.path.dirname(__file__), 'ready_tmx')
 
 from config import *
 
-def unescape(text):
-    def fixup(m):
-        text = m.group(0)
-        # character reference
-        try:
-            if text[:3] == "&#x":
-                return chr(int(text[3:-1], 16))
-            else:
-                return chr(int(text[2:-1]))
-        except ValueError:
-            pass
-    return re.sub("&#?\w+;", fixup, text)
 
 class ZhXMLProcessor():
     def __init__(self, dict_path):
         self.re_link = re.compile('(?:see_|see_also_|(?:old)?variant_of_|same_as_)([^,]*)')
-        self.re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]') # LEAVING WORKING PUNCT
+        self.re_punct = re.compile('[《》“”！。？：  -‘、…；\n 　’—（）0-9，－]')  # LEAVING WORKING PUNCT
         self.punct_dict = ''.maketrans(
-                {'，': ',', '。': '.', '？': '?', '、': ',', '！': '!', '：': ':', '；': ';', '（': '(', '）': ')', '“': '"',
-                 '”': '"', '-': '-', '《': '«', '》': '»'})
+            {'，': ',', '。': '.', '？': '?', '、': ',', '！': '!', '：': ':', '；': ';', '（': '(', '）': ')', '“': '"',
+             '”': '"', '-': '-', '《': '«', '》': '»'})
         try:
             with open(DICK_CACHE, 'r') as jsonfile:
                 self.cedict = json.load(jsonfile)
@@ -41,13 +32,13 @@ class ZhXMLProcessor():
             with open(DICK_CACHE, 'w') as outfile:
                 json.dump(self.cedict, outfile)
 
-    def load_dict(self, path): 
+    def load_dict(self, path):
         """
         transforms the dictionary file into a computationally feasible format
         :param path: the path to the dictionary
         :return: dictionary in the form {new_tok: (old_tok, transcr, transl) ...}
         """
-        re_transcr = re.compile('([^\]]*\])') 
+        re_transcr = re.compile('([^\]]*\])')
         print('load dict...', time.asctime())
         cedict = {}
         with open(path, 'r', encoding='utf-8') as f:
@@ -68,11 +59,11 @@ class ZhXMLProcessor():
                     cedict[new].append((old, transcr, transl))
         return cedict
 
-    def search_dict(self, word):
-        definition = ''
-        return definition
-
     def convert_pinyin(self, car):
+        """
+        changes some symbols in the transcription to more specific ones
+        
+        """
         # car = car.lower()
         car = re.sub(r"a5", "a", car)
         car = re.sub(r"e5", "e", car)
@@ -207,12 +198,12 @@ class ZhXMLProcessor():
         return car
 
     def clean_transcr(self, definition):
-        transcr = definition[1].strip('[').strip(']').replace(' ','')
+        transcr = definition[1].strip('[').strip(']').replace(' ', '')
         transcr = self.convert_pinyin(transcr)
         return transcr
 
     def process_classifiers(self, definition):
-        cl = re.findall(r'/CL:.+?/',definition[2])
+        cl = re.findall(r'/CL:.+?/', definition[2])
         gr_cl = []
         for c in cl:
             gr_cl.append(c.strip('/'))
@@ -220,29 +211,32 @@ class ZhXMLProcessor():
             gr_cl = 'NO'
         elif len(gr_cl) > 0:
             gr_cl = ','.join(gr_cl)
-            gr_cl = gr_cl.replace('[,',',').replace('CL:','')
-            gr_cl = re.sub(r'\w\|','',gr_cl)
+            gr_cl = gr_cl.replace('[,', ',').replace('CL:', '')
+            gr_cl = re.sub(r'\w\|', '', gr_cl)
             gr_cl = self.convert_pinyin(gr_cl)
         return gr_cl
 
     def clean_sem(self, definition):
-        #print(definition)
         defi = definition[2]
-        #print(defi)
         cls = re.findall(r'/CL:.+?/', defi)
         for cl in cls:
-            #print(cl)
-            defi = defi.replace(cl,'')
-        #print(defi)
-        sem = defi.replace(' ','_').replace('/',' ').replace(',_',' ').replace(',',' ').strip('_').strip()
-        transcr = re.findall(r'\[[0-9A-z]+?\]',sem)
+            defi = defi.replace(cl, '')
+        sem = defi.replace(' ', '_').replace('/', ' ').replace(',_', ' ').replace(',', ' ').strip('_').strip()
+        transcr = re.findall(r'\[[0-9A-z]+?\]', sem)
         for tr in transcr:
-            tr_ = self.convert_pinyin(tr).replace('_','')
-            sem = sem.replace(tr,tr_)
+            tr_ = self.convert_pinyin(tr).replace('_', '')
+            sem = sem.replace(tr, tr_)
         return sem
 
-    def process_para(self, txt_ru, txt_zh):
+    def process_para(self, txt_ru, txt_zh, now):
+        """
+        makes a new node od ElementTree - tuple of russian, chineese and transcription
+        controls the structure of tags
+        returns this node
+        
+        """
         para = ET.Element("para")
+        para.set('id', str(now))
         ET.SubElement(para, "se", lang="ru").text = txt_ru
         zh = ET.SubElement(para, "se", lang="zh")
         zh.text = ""
@@ -251,98 +245,107 @@ class ZhXMLProcessor():
         last_zh = None
         last_zh2 = None
         pos = 0
-        #print(txt_zh)
-        while pos < len(txt_zh):
-            cnt = 1
-            while txt_zh[pos:pos+cnt] in self.cedict.keys() and cnt < len(txt_zh) - pos:
-                #print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
-                cnt += 1
-            key = txt_zh[pos:pos+cnt-1]
-            if len(key) < 1:        # not found in dict
-                # add non-found char to hz/zh2
-                key = txt_zh[pos:pos+1]
-                if last_zh is not None:
-                    if last_zh.tail == None:
-                        last_zh.tail = ""
-                    last_zh.tail += key
-                else:
-                    zh.text = zh.text + key
-                key = key.translate(self.punct_dict)
-                if last_zh2 is not None:
-                    if last_zh2.tail == None:
-                        last_zh2.tail = ""
-                    last_zh2.tail += key
-                else:
-                    zh2.text = zh2.text + key
-                pos += 1
-                continue
-            pos += cnt - 1
-            #print("Found key: %s (%d)\n" % (key, cnt))
-            worddef = self.cedict[key]
-            #print('KEY PRINTING...', key)
-            #print('JSON PRINTING...',self.cedict[key])
-            # TODO: form correct definition
-            last_zh = ET.SubElement(zh, 'w')
-            last_zh2 = ET.SubElement(zh2, 'w')
-            ana_zh = None
-            transcr = ""
-            ana_zh2 = None
-            all_transcr = []
-            for definition in worddef:
-                #print(definition)
-                # Appending <ana> for each interpretation
-                transcr = self.clean_transcr(definition)
-                if transcr.lower() not in all_transcr:
-                    all_transcr.append(transcr.lower())
-                desc = self.clean_sem(definition)
-                gr_cls = self.process_classifiers(definition)
-                #print(gr_cls)
-                #print(desc)
-                if desc in ['MOD', 'PFV', 'PRG', 'PST', 'EVAL', 'QUEST', 'CAUS', 'PL', 'BA', 'ATRN', 'ATRV', 'PASS', 'DIR']:
-                #if desc == 'MOD' or desc == 'PFV' or desc == 'PRG' or desc == 'PST' or desc == 'EVAL' or desc == 'QUEST' or desc == 'CAUS' or desc == 'PL' or desc == 'BA' or desc == 'ATRN' or desc == 'ATRV' or desc == 'PASS' or desc == 'DIR':
-                    ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, gr=desc)
-                    ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
-                else:
-                    if gr_cls != 'NO':
-                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr = 'DEFAULT，' + gr_cls)
-                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr = 'DEFAULT，' + gr_cls)
+        worddef = []
+        if txt_zh != None:
+            while pos < len(txt_zh):
+                cnt = 1
+                while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt < len(txt_zh) - pos:
+                    #print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
+                    cnt += 1
+                key = txt_zh[pos:pos + cnt - 1]
+                if len(key) < 1:        # not found in dict
+                    # add non-found char to zh/zh2
+                    key = txt_zh[pos:pos + 1]
+                    if last_zh is not None:
+                        if last_zh.tail == None:
+                            last_zh.tail = ""
+                        last_zh.tail += key
                     else:
-                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc,gr='DEFAULT')
-                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc,gr='DEFAULT')
-            ana_zh.tail = key
-            transcr_lem = "/".join(all_transcr)
-            #print(transcr_lem)
-            ana_zh2.tail = transcr_lem
+                        zh.text = zh.text + key
+                    key = key.translate(self.punct_dict)
+                    if last_zh2 is not None:
+                        if last_zh2.tail == None:
+                            last_zh2.tail = ""
+                        last_zh2.tail += key
+                    else:
+                        zh2.text = zh2.text + key
+                    pos += 1
+                    continue
+                pos += cnt - 1
+                #print("Found key: %s (%d)\n" % (key, cnt))
+                worddef = self.cedict[key]
+                #print('KEY PRINTING...', key)
+                #print('JSON PRINTING...',self.cedict[key])
+                # TODO: form correct definition
+                last_zh = ET.SubElement(zh, 'w')
+                last_zh2 = ET.SubElement(zh2, 'w')
+                ana_zh = None
+                transcr = ""
+                ana_zh2 = None
+                all_transcr = []
+                for definition in worddef:
+                    # Appending <ana> for each interpretation
+                    transcr = self.clean_transcr(definition)
+                    if transcr.lower() not in all_transcr:
+                        all_transcr.append(transcr.lower())
+                    desc = self.clean_sem(definition)
+                    gr_cls = self.process_classifiers(definition)
+                    if desc in ['MOD', 'PFV', 'PRG', 'PST', 'EVAL', 'QUEST', 'CAUS', 'PL', 'BA', 'ATRN', 'ATRV', 'PASS', 'DIR']:
+                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, gr=desc)
+                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
+                    else:
+                        if gr_cls != 'NO':
+                            ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
+                            ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
+                        else:
+                            ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT')
+                            ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT')
+                if ana_zh != None:
+                    ana_zh.tail = key
+                transcr_lem = "/".join(all_transcr)
+                #print(transcr_lem)
+                if ana_zh2 != None:
+                    ana_zh2.tail = transcr_lem
         return para
-
-    def process_file(self, path):   
-        # TODO: autodetect encoding from XML header/whatnot
+    
+    def process_file(self, path):
+        """
+        opens a file .xml
+        adds chineese transcriptions and english definitions
+        writes the result to another file, which ends with "_processed.xml"
+        
+        """
         with open(path, 'r', encoding='utf-8') as fh:
-            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w')
+            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w', encoding = 'utf-8')
             new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n<head>\n</head>\n<body>')
+            now = 1
             html = fh.read()
             #html = html.replace('encoding="UTF-16"', '')
             root = ET.XML(html)
-            for parent in root.xpath('//PARAGRAPH'):  # Search for parent elements
+            for parent in root.xpath('//tu'):  # Search for parent elements
                 parent.tag = 'para'
                 ru = ""
                 zh = ""
-                for sent in parent:
-                    if sent.tag == 'FOREIGN':
-                        zh = sent.text
-                    if sent.tag == 'NATIVE':
-                        ru = sent.text
-                if len(ru) < 1 or len(zh) < 1:
+                for lang in parent:
+                    for sent in lang:
+                        buf_tag = lang.attrib['{http://www.w3.org/XML/1998/namespace}lang']                    
+                        if buf_tag == "zh":
+                            zh = sent.text
+                        if buf_tag == "ru":
+                            ru = sent.text
+                if ru == None or zh == None:
                     print("Error fetching sentence!")
-                para = self.process_para(ru, zh)
-                parent[:] = para
-                new_f.write(unescape(ET.tostring(parent, pretty_print=True, method="xml").decode('utf-8')).replace(">", ">\n"))
+                if ru != None or zh != None:
+                    para = self.process_para(ru, zh, now)
+                    now += 1
+                    new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding = 'unicode').replace(">", ">\n"))
             new_f.write("</body></html>")
             new_f.close()
+
 
 if __name__ == '__main__':
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
-        if f.endswith('.xml') and '_processed' not in f  and 'REPL' not in f:
+        if f.endswith('.xml') and '_processed' not in f and 'REPL' not in f:
             print("Processing %s" % f)
             proc.process_file(os.path.join(PATH, f))
