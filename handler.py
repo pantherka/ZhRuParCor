@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#coding=utf-8
+# coding=utf-8
 
 import re
 import os
@@ -9,6 +9,7 @@ from collections import OrderedDict
 import lxml.etree as ET
 from lxml import objectify
 import json
+from pymystem3 import Mystem
 
 DICK_PATH = 'cedict_ts.u8'
 DICK_CACHE = 'cedict.txt'
@@ -62,7 +63,7 @@ class ZhXMLProcessor():
     def convert_pinyin(self, car):
         """
         changes some symbols in the transcription to more specific ones
-        
+
         """
         # car = car.lower()
         car = re.sub(r"a5", "a", car)
@@ -228,43 +229,83 @@ class ZhXMLProcessor():
             sem = sem.replace(tr, tr_)
         return sem
 
+    def process_ru(self, para, txt_ru, tag):
+        """
+        adds morphological tagging for russian words using pymystem3
+        returns a node with tagged russian text
+        """
+        ru = ET.Element("se", lang=tag)
+        ru.text = ""
+        analyz = mystem.analyze(txt_ru)
+        last_ru = None
+        for word in analyz:
+            if 'analysis' not in word or word['analysis'] == []:
+                if last_ru is not None:
+                    if last_ru.tail is None:
+                        last_ru.tail = ''
+                    last_ru.tail += word['text']
+                else:
+                    ru.text = word['text']
+            else:
+                last_ru = ET.SubElement(ru, 'w')
+                for ana in word['analysis']:
+                    lex = ana['lex']
+                    text = word['text']
+                    buf = ana['gr']
+                    if buf[len(buf) - 1] == '=':
+                        buf = buf[:-1]
+                    buf = buf.replace('=', ',')
+                    parts = buf.split('(')
+                    if len(parts) == 1:
+                        ana_ru = ET.SubElement(last_ru, 'ana', gr=parts[0], lex=lex)
+                    else:
+                        parts[0] = parts[0][:-1]
+                        if parts[1][-1] == ')':
+                            parts[1] = parts[1][:-1]
+                        ana_ru = None
+                        for disamb in parts[1].split('|'):
+                            ana_ru = ET.SubElement(last_ru, 'ana', gr=parts[0] + ',' + disamb, lex=lex)
+                ana_ru.tail = text
+        return ru
+
     def process_para(self, txt_ru, txt_zh, now):
         """
         makes a new node od ElementTree - tuple of russian, chineese and transcription
         controls the structure of tags
         returns this node
-        
+
         """
         para = ET.Element("para")
         para.set('id', str(now))
-        ET.SubElement(para, "se", lang="ru").text = txt_ru
         zh = ET.SubElement(para, "se", lang="zh")
         zh.text = ""
         zh2 = ET.SubElement(para, "se", lang="zh2")
         zh2.text = ""
         last_zh = None
         last_zh2 = None
-        pos = 0
         worddef = []
-        if txt_zh != None:
+        if txt_ru is not None:
+            ru = para.insert(0, self.process_ru(para, txt_ru, 'ru'))
+        if txt_zh is not None:
+            pos = 0
             while pos < len(txt_zh):
                 cnt = 1
                 while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt < len(txt_zh) - pos:
-                    #print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
+                    # print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
                     cnt += 1
                 key = txt_zh[pos:pos + cnt - 1]
                 if len(key) < 1:        # not found in dict
                     # add non-found char to zh/zh2
                     key = txt_zh[pos:pos + 1]
                     if last_zh is not None:
-                        if last_zh.tail == None:
+                        if last_zh.tail is None:
                             last_zh.tail = ""
                         last_zh.tail += key
                     else:
                         zh.text = zh.text + key
                     key = key.translate(self.punct_dict)
                     if last_zh2 is not None:
-                        if last_zh2.tail == None:
+                        if last_zh2.tail is None:
                             last_zh2.tail = ""
                         last_zh2.tail += key
                     else:
@@ -272,10 +313,10 @@ class ZhXMLProcessor():
                     pos += 1
                     continue
                 pos += cnt - 1
-                #print("Found key: %s (%d)\n" % (key, cnt))
+                # print("Found key: %s (%d)\n" % (key, cnt))
                 worddef = self.cedict[key]
-                #print('KEY PRINTING...', key)
-                #print('JSON PRINTING...',self.cedict[key])
+                # print('KEY PRINTING...', key)
+                # print('JSON PRINTING...',self.cedict[key])
                 # TODO: form correct definition
                 last_zh = ET.SubElement(zh, 'w')
                 last_zh2 = ET.SubElement(zh2, 'w')
@@ -300,52 +341,71 @@ class ZhXMLProcessor():
                         else:
                             ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT')
                             ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT')
-                if ana_zh != None:
+                if ana_zh is not None:
                     ana_zh.tail = key
                 transcr_lem = "/".join(all_transcr)
-                #print(transcr_lem)
-                if ana_zh2 != None:
+                # print(transcr_lem)
+                if ana_zh2 is not None:
                     ana_zh2.tail = transcr_lem
         return para
-    
-    def process_file(self, path):
+
+    def process_file(self, path, meta):
         """
-        opens a file .xml
+        opens a file .xml and a file with metainfo _meta.txt
         adds chineese transcriptions and english definitions
         writes the result to another file, which ends with "_processed.xml"
-        
+
         """
         with open(path, 'r', encoding='utf-8') as fh:
-            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w', encoding = 'utf-8')
-            new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n<head>\n</head>\n<body>')
-            now = 1
+            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w', encoding='utf-8')
+            new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n<head>\n')
             html = fh.read()
-            #html = html.replace('encoding="UTF-16"', '')
+            # html = html.replace('encoding="UTF-16"', '')
             root = ET.XML(html)
+            with open(meta, 'r', encoding='utf-8') as fmeta:
+                info = ET.Element("head")
+                for line in fmeta:
+                    if 'head>' not in line:
+                        new_info = ET.fromstring(line)
+                        info.append(new_info)
+                new_f.write(ET.tostring(info, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
+            new_f.write('</head>\n<body>')
+            now = 1
             for parent in root.xpath('//tu'):  # Search for parent elements
                 parent.tag = 'para'
                 ru = ""
                 zh = ""
                 for lang in parent:
                     for sent in lang:
-                        buf_tag = lang.attrib['{http://www.w3.org/XML/1998/namespace}lang']                    
+                        buf_tag = lang.attrib['{http://www.w3.org/XML/1998/namespace}lang']
                         if buf_tag == "zh":
                             zh = sent.text
                         if buf_tag == "ru":
                             ru = sent.text
-                if ru == None or zh == None:
+                if ru is None or zh is None:
                     print("Error fetching sentence!")
-                if ru != None or zh != None:
+                if ru is not None or zh is not None:
                     para = self.process_para(ru, zh, now)
                     now += 1
-                    new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding = 'unicode').replace(">", ">\n"))
+                    new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
             new_f.write("</body></html>")
             new_f.close()
 
 
 if __name__ == '__main__':
+    mystem = Mystem(
+        disambiguation=False,
+        weight=False,
+        generate_all=True,
+        use_english_names=True,)
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
         if f.endswith('.xml') and '_processed' not in f and 'REPL' not in f:
             print("Processing %s" % f)
-            proc.process_file(os.path.join(PATH, f))
+            p = os.path.abspath(f)
+            name = os.path.basename(p)
+            meta = PATH + '\\' + name[:name.find('.')] + '_meta.txt'
+            if os.path.exists(meta):
+                proc.process_file(os.path.join(PATH, f), meta)
+            else:
+                print("Error connecting metainfo for %s" % f)
