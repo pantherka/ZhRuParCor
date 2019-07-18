@@ -15,8 +15,6 @@ DICK_PATH = 'cedict_ts.u8'
 DICK_CACHE = 'cedict.txt'
 PATH = os.path.join(os.path.dirname(__file__), 'ready_tmx')
 
-from config import *
-
 
 class ZhXMLProcessor():
     def __init__(self, dict_path):
@@ -356,9 +354,9 @@ class ZhXMLProcessor():
         writes the result to another file, which ends with "_processed.xml"
 
         """
-        with open(path, 'r', encoding='utf-8') as fh:
+        with open(path, 'rb') as fh:
             new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w', encoding='utf-8')
-            new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n<head>\n')
+            new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n')
             html = fh.read()
             # html = html.replace('encoding="UTF-16"', '')
             root = ET.XML(html)
@@ -369,7 +367,7 @@ class ZhXMLProcessor():
                         new_info = ET.fromstring(line)
                         info.append(new_info)
                 new_f.write(ET.tostring(info, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
-            new_f.write('</head>\n<body>')
+            new_f.write('<body>')
             now = 1
             for parent in root.xpath('//tu'):  # Search for parent elements
                 parent.tag = 'para'
@@ -378,9 +376,9 @@ class ZhXMLProcessor():
                 for lang in parent:
                     for sent in lang:
                         buf_tag = lang.attrib['{http://www.w3.org/XML/1998/namespace}lang']
-                        if buf_tag == "zh":
+                        if buf_tag.split('-')[0] == 'zh':
                             zh = sent.text
-                        if buf_tag == "ru":
+                        if buf_tag.split('-')[0] == 'ru':
                             ru = sent.text
                 if ru is None or zh is None:
                     print("Error fetching sentence!")
