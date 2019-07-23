@@ -288,7 +288,7 @@ class ZhXMLProcessor():
             pos = 0
             while pos < len(txt_zh):
                 cnt = 1
-                while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt < len(txt_zh) - pos:
+                while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt <= len(txt_zh) - pos:
                     # print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
                     cnt += 1
                 key = txt_zh[pos:pos + cnt - 1]
@@ -366,7 +366,7 @@ class ZhXMLProcessor():
                     if 'head>' not in line:
                         new_info = ET.fromstring(line)
                         info.append(new_info)
-                new_f.write(ET.tostring(info, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
+                new_f.write(ET.tostring(info, pretty_print=True, method="xml", encoding='unicode'))
             new_f.write('<body>')
             now = 1
             for parent in root.xpath('//tu'):  # Search for parent elements
