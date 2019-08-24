@@ -10,6 +10,7 @@ import lxml.etree as ET
 from lxml import objectify
 import json
 from pymystem3 import Mystem
+import openpyxl
 
 DICK_PATH = 'cedict_ts.u8'
 DICK_CACHE = 'cedict.txt'
@@ -232,7 +233,7 @@ class ZhXMLProcessor():
         adds morphological tagging for russian words using pymystem3
         returns a node with tagged russian text
         """
-        ru = ET.Element("se", lang=tag)
+        ru = ET.SubElement(para, "se", lang=tag)
         ru.text = ""
         analyz = mystem.analyze(txt_ru)
         last_ru = None
@@ -264,7 +265,77 @@ class ZhXMLProcessor():
                         for disamb in parts[1].split('|'):
                             ana_ru = ET.SubElement(last_ru, 'ana', gr=parts[0] + ',' + disamb, lex=lex)
                 ana_ru.tail = text
-        return ru
+
+    def process_zh(self, para, txt_zh):
+        """
+        adds transcription and definition to chineese text
+        """
+        zh = ET.SubElement(para, "se", lang="zh")
+        zh.text = ""
+        zh2 = ET.SubElement(para, "se", lang="zh2")
+        zh2.text = ""
+        last_zh = None
+        last_zh2 = None
+        pos = 0
+        while pos < len(txt_zh):
+            cnt = 1
+            while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt <= len(txt_zh) - pos:
+                # print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
+                cnt += 1
+            key = txt_zh[pos:pos + cnt - 1]
+            if len(key) < 1:        # not found in dict
+                # add non-found char to zh/zh2
+                key = txt_zh[pos:pos + 1]
+                if last_zh is not None:
+                    if last_zh.tail is None:
+                        last_zh.tail = ""
+                    last_zh.tail += key
+                else:
+                    zh.text = zh.text + key
+                key = key.translate(self.punct_dict)
+                if last_zh2 is not None:
+                    if last_zh2.tail is None:
+                        last_zh2.tail = ""
+                    last_zh2.tail += key
+                else:
+                    zh2.text = zh2.text + key
+                pos += 1
+                continue
+            pos += cnt - 1
+            # print("Found key: %s (%d)\n" % (key, cnt))
+            worddef = self.cedict[key]
+            # print('KEY PRINTING...', key)
+            # print('JSON PRINTING...',self.cedict[key])
+            # TODO: form correct definition
+            last_zh = ET.SubElement(zh, 'w')
+            last_zh2 = ET.SubElement(zh2, 'w')
+            ana_zh = None
+            transcr = ""
+            ana_zh2 = None
+            all_transcr = []
+            for definition in worddef:
+                # Appending <ana> for each interpretation
+                transcr = self.clean_transcr(definition)
+                if transcr.lower() not in all_transcr:
+                    all_transcr.append(transcr.lower())
+                desc = self.clean_sem(definition)
+                gr_cls = self.process_classifiers(definition)
+                if desc in ['MOD', 'PFV', 'PRG', 'PST', 'EVAL', 'QUEST', 'CAUS', 'PL', 'BA', 'ATRN', 'ATRV', 'PASS', 'DIR']:
+                    ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, gr=desc)
+                    ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
+                else:
+                    if gr_cls != 'NO':
+                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
+                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
+                    else:
+                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT')
+                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT')
+            if ana_zh is not None:
+                ana_zh.tail = key
+            transcr_lem = "/".join(all_transcr)
+            # print(transcr_lem)
+            if ana_zh2 is not None:
+                ana_zh2.tail = transcr_lem
 
     def process_para(self, txt_ru, txt_zh, now):
         """
@@ -275,76 +346,11 @@ class ZhXMLProcessor():
         """
         para = ET.Element("para")
         para.set('id', str(now))
-        zh = ET.SubElement(para, "se", lang="zh")
-        zh.text = ""
-        zh2 = ET.SubElement(para, "se", lang="zh2")
-        zh2.text = ""
-        last_zh = None
-        last_zh2 = None
         worddef = []
         if txt_ru is not None:
-            ru = para.insert(0, self.process_ru(para, txt_ru, 'ru'))
+            self.process_ru(para, txt_ru, 'ru')
         if txt_zh is not None:
-            pos = 0
-            while pos < len(txt_zh):
-                cnt = 1
-                while txt_zh[pos:pos + cnt] in self.cedict.keys() and cnt <= len(txt_zh) - pos:
-                    # print("Checking key: %s (%d)" % (txt_zh[pos:pos+cnt], cnt))
-                    cnt += 1
-                key = txt_zh[pos:pos + cnt - 1]
-                if len(key) < 1:        # not found in dict
-                    # add non-found char to zh/zh2
-                    key = txt_zh[pos:pos + 1]
-                    if last_zh is not None:
-                        if last_zh.tail is None:
-                            last_zh.tail = ""
-                        last_zh.tail += key
-                    else:
-                        zh.text = zh.text + key
-                    key = key.translate(self.punct_dict)
-                    if last_zh2 is not None:
-                        if last_zh2.tail is None:
-                            last_zh2.tail = ""
-                        last_zh2.tail += key
-                    else:
-                        zh2.text = zh2.text + key
-                    pos += 1
-                    continue
-                pos += cnt - 1
-                # print("Found key: %s (%d)\n" % (key, cnt))
-                worddef = self.cedict[key]
-                # print('KEY PRINTING...', key)
-                # print('JSON PRINTING...',self.cedict[key])
-                # TODO: form correct definition
-                last_zh = ET.SubElement(zh, 'w')
-                last_zh2 = ET.SubElement(zh2, 'w')
-                ana_zh = None
-                transcr = ""
-                ana_zh2 = None
-                all_transcr = []
-                for definition in worddef:
-                    # Appending <ana> for each interpretation
-                    transcr = self.clean_transcr(definition)
-                    if transcr.lower() not in all_transcr:
-                        all_transcr.append(transcr.lower())
-                    desc = self.clean_sem(definition)
-                    gr_cls = self.process_classifiers(definition)
-                    if desc in ['MOD', 'PFV', 'PRG', 'PST', 'EVAL', 'QUEST', 'CAUS', 'PL', 'BA', 'ATRN', 'ATRV', 'PASS', 'DIR']:
-                        ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, gr=desc)
-                        ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, gr=desc)
-                    else:
-                        if gr_cls != 'NO':
-                            ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
-                            ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT，' + gr_cls)
-                        else:
-                            ana_zh = ET.SubElement(last_zh, "ana", lex=key, transcr=transcr, sem=desc, gr='DEFAULT')
-                            ana_zh2 = ET.SubElement(last_zh2, "ana", lex=transcr, transcr=transcr, sem=desc, gr='DEFAULT')
-                if ana_zh is not None:
-                    ana_zh.tail = key
-                transcr_lem = "/".join(all_transcr)
-                # print(transcr_lem)
-                if ana_zh2 is not None:
-                    ana_zh2.tail = transcr_lem
+            self.process_zh(para, txt_zh)
         return para
 
     def process_file(self, path, meta):
@@ -389,6 +395,35 @@ class ZhXMLProcessor():
             new_f.write("</body></html>")
             new_f.close()
 
+    def process_xlsx(self, path, meta):
+        """
+        opens a file .xml and a file with metainfo _meta.txt
+        adds chineese transcriptions and english definitions
+        writes the result to another file, which ends with "_processed.xml"
+
+        """
+        with open(path, 'rb') as fh:
+            new_f = open(path.rsplit('.', 1)[0] + '_processed.xml', 'w', encoding='utf-8')
+            new_f.write('<?xml version="1.0" encoding="utf-8"?><html>\n')
+            wb = openpyxl.load_workbook(fh)
+            sheet = wb[wb.sheetnames[0]]
+            with open(meta, 'r', encoding='utf-8') as fmeta:
+                info = ET.Element("head")
+                for line in fmeta:
+                    if 'head>' not in line:
+                        new_info = ET.fromstring(line)
+                        info.append(new_info)
+                new_f.write(ET.tostring(info, pretty_print=True, method="xml", encoding='unicode'))
+            new_f.write('<body>')
+            row_amount = sheet.max_row
+            now = 1
+            for i in range(1, row_amount):
+                para = self.process_para(sheet.cell(row=i, column=1).value, sheet.cell(row=i, column=2).value, now)
+                now += 1
+                new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
+        new_f.write("</body></html>")
+        new_f.close()
+
 
 if __name__ == '__main__':
     mystem = Mystem(
@@ -405,5 +440,15 @@ if __name__ == '__main__':
             meta = PATH + '\\' + name[:name.find('.')] + '_meta.txt'
             if os.path.exists(meta):
                 proc.process_file(os.path.join(PATH, f), meta)
+            else:
+                print("Error connecting metainfo for %s" % f)
+    for f in os.listdir(PATH):
+        if f.endswith('.xlsx') and '_processed' not in f and 'REPL' not in f:
+            print("Processing %s" % f)
+            p = os.path.abspath(f)
+            name = os.path.basename(p)
+            meta = PATH + '\\' + name[:name.find('.')] + '_meta.txt'
+            if os.path.exists(meta):
+                proc.process_xlsx(os.path.join(PATH, f), meta)
             else:
                 print("Error connecting metainfo for %s" % f)
