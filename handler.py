@@ -391,7 +391,7 @@ class ZhXMLProcessor():
                 if ru is not None or zh is not None:
                     para = self.process_para(ru, zh, now)
                     now += 1
-                    new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
+                    new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode'))
             new_f.write("</body></html>")
             new_f.close()
 
@@ -420,7 +420,7 @@ class ZhXMLProcessor():
             for i in range(1, row_amount):
                 para = self.process_para(sheet.cell(row=i, column=1).value, sheet.cell(row=i, column=2).value, now)
                 now += 1
-                new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode').replace(">", ">\n"))
+                new_f.write(ET.tostring(para, pretty_print=True, method="xml", encoding='unicode'))
         new_f.write("</body></html>")
         new_f.close()
 
@@ -433,7 +433,7 @@ if __name__ == '__main__':
         use_english_names=True,)
     proc = ZhXMLProcessor(DICK_PATH)
     for f in os.listdir(PATH):
-        if f.endswith('.xml') and '_processed' not in f and 'REPL' not in f:
+        if (f.endswith('.tmx') or f.endswith('.xml')) and '_processed' not in f and 'REPL' not in f:
             print("Processing %s" % f)
             p = os.path.abspath(f)
             name = os.path.basename(p)
